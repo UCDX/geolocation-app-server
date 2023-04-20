@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Geolocalización de Usuarios</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.1.3/socket.io.js"></script>
+</head>
+<body>
+  <h1>Geolocalización de Usuarios</h1>
+  <div id="info-usuario">
+    <h2>Mi Información</h2>
+    <p>Latitud: <span id="latitud"></span></p>
+    <p>Longitud: <span id="longitud"></span></p>
+  </div>
+  <div id="usuarios-cercanos">
+    <h2>Usuarios Cercanos</h2>
+    <ul id="lista-usuarios"></ul>
+  </div>
+  <script>
+    var socket = io.connect();
+    socket.on('connect', function() {
+      console.log('Conectado al servidor de SocketIO');
+    });
+    socket.on('usuarios_cercanos', function(data) {
+      // Actualizar la lista de usuarios cercanos en el frontend
+      $('#lista-usuarios').empty();
+      $.each(data.usuarios, function(index, usuario) {
+        $('#lista-usuarios').append('<li>Latitud: ' + usuario.lat + ', Longitud: ' + usuario.lon + '</li>');
+      });
+    });
+    // Obtener la geolocalización del usuario
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(function(position) {
+        var latitud = position.coords.latitude;
+        var longitud = position.coords.longitude;
+        $('#latitud').text(latitud);
+        $('#longitud').text(longitud);
+        // Enviar la geolocalización al servidor
+        socket.emit('ubicacion', {lat: latitud, lon: longitud});
+      });
+    } else {
+      console.log('Geolocalización no es soportada por este navegador');
+    }
+  </script>
+</body>
+</html>
