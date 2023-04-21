@@ -20,6 +20,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(255), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
     age = db.Column(db.Integer, nullable=True)
     birthdate = db.Column(db.Date, nullable=True)
     interests = db.Column(db.Text, nullable=True)
@@ -41,10 +42,10 @@ def register():
         # Verificar si el usuario ya existe en la base de datos
         user = User.query.filter_by(username=username).first()
         if user:
-            return jsonify({'message': 'El usuario ya existe en la base de datos'})
+            return jsonify({'message': 'El usuario ya existe en la base de datos'}), 409
 
         # Crear un nuevo usuario y almacenarlo en la base de datos
-        new_user = User(username=username, password=password)
+        new_user = User(username=username, password=password, name=username)
         db.session.add(new_user)
         db.session.commit()
 
@@ -92,6 +93,7 @@ def get_user(user_id):
         user_info = {
             'id': user.id,
             'username': user.username,
+            'name': user.name,
             'age': user.age,
             'birthdate': str(user.birthdate),
             'interests': user.interests
@@ -109,13 +111,15 @@ def update_user(user_id):
     if user:
         data = request.get_json()
         if data:
+            name = data.get('name')
             age = data.get('age')
-            birthdate = data.get('birthdate')
+            birthdate = datetime.datetime.strptime( data.get('birthdate'), '%d/%m/%Y').strftime('%Y-%m-%d')
             interests = data.get('interests')
 
             if not age or not birthdate or not interests:
                 return jsonify({'message': 'Faltan datos obligatorios'}), 400
 
+            user.name = name
             user.age = age
             user.birthdate = birthdate
             user.interests = interests
@@ -124,6 +128,7 @@ def update_user(user_id):
             user_info = {
                 'id': user.id,
                 'username': user.username,
+                'name': user.name,
                 'age': user.age,
                 'birthdate': str(user.birthdate),
                 'interests': user.interests

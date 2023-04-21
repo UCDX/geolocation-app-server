@@ -4,17 +4,11 @@
 
 ### Dependecias a instalar
 
-- Flask
-- flask_sqlalchemy
-- mysqlclient
-- python-dotenv
-- Flask-Cors
-- Flask-SocketIO
-- geopy
+Para instalar las dependencias utilice el comando: 
+
+`pip install -r requirements.txt`
 
 ### Variables de entorno
-
-##### Requirements
 
 Es importante configurar las siguientes variables de entorno
 
