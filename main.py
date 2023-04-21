@@ -25,9 +25,10 @@ class User(db.Model):
     birthdate = db.Column(db.Date, nullable=True)
     interests = db.Column(db.Text, nullable=True)
 
-    def __init__(self, username, password, age=None, birthdate=None, interests=None):
+    def __init__(self, username, password, name, age=None, birthdate=None, interests=None):
         self.username = username
         self.password = password
+        self.name = name
         self.age = age
         self.birthdate = birthdate
         self.interests = interests
