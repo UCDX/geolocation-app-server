@@ -4,7 +4,7 @@ from flask_socketio import SocketIO, emit
 from geopy.distance import great_circle
 from config import DATABASE_CONNECTION_URI
 from flask_cors import CORS
-import datetime
+from datetime import datetime
 
 app = Flask(__name__)
 # Configurar CORS
@@ -96,7 +96,7 @@ def get_user(user_id):
             'username': user.username,
             'name': user.name,
             'age': user.age,
-            'birthdate': str(user.birthdate),
+            'birthdate': datetime.strptime( str(user.birthdate), '%Y-%m-%d').strftime('%m/%d/%Y'),
             'interests': user.interests
         }
         return jsonify({
@@ -114,7 +114,7 @@ def update_user(user_id):
         if data:
             name = data.get('name')
             age = data.get('age')
-            birthdate = datetime.datetime.strptime( data.get('birthdate'), '%d/%m/%Y').strftime('%Y-%m-%d')
+            birthdate = datetime.strptime( data.get('birthdate'), '%m/%d/%Y').strftime('%Y-%m-%d')
             interests = data.get('interests')
 
             if not age or not birthdate or not interests:
