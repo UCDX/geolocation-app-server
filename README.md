@@ -8,6 +8,7 @@
 - flask_sqlalchemy
 - mysqlclient
 - python-dotenv
+- Flask-Cors
 - Flask-SocketIO
 - geopy
 

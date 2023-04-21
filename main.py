@@ -3,9 +3,12 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
 from geopy.distance import great_circle
 from config import DATABASE_CONNECTION_URI
+from flask_cors import CORS
 import datetime
 
 app = Flask(__name__)
+# Configurar CORS
+CORS(app, resources={r"/*": {"origins": "*"}})  # Permitir todas las solicitudes desde cualquier origen
 socketio = SocketIO(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_CONNECTION_URI
 db = SQLAlchemy(app)
