@@ -159,7 +159,7 @@ last_user_info_sent = {}
 # Detects when a user is in the detection area of other one.
 def nearby_users_detection_loop(users: dict):
     print('------ Detection Loop ------ ')
-    dist_treshold = 1 # in metters
+    dist_treshold = 25 # in metters
     while True:
         users_ = users.copy()
         l = len(users_)
