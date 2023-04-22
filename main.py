@@ -1,17 +1,26 @@
 from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import create_engine, text
 from flask_socketio import SocketIO, emit
 from geopy.distance import great_circle
 from config import DATABASE_CONNECTION_URI
 from flask_cors import CORS
 from datetime import datetime
+from threading import Thread
+import numpy as np
+import time
 
 app = Flask(__name__)
 # Configurar CORS
 CORS(app, resources={r"/*": {"origins": "*"}})  # Permitir todas las solicitudes desde cualquier origen
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_CONNECTION_URI
 db = SQLAlchemy(app)
+
+# DB
+
+engine = create_engine(DATABASE_CONNECTION_URI, pool_size=10, pool_recycle=3600)
+conn = engine.connect()
 
 # ---------------------------------------------------------------------------------------------
 
@@ -96,7 +105,7 @@ def get_user(user_id):
             'username': user.username,
             'name': user.name,
             'age': user.age,
-            'birthdate': datetime.strptime( str(user.birthdate), '%Y-%m-%d').strftime('%m/%d/%Y'),
+            'birthdate': datetime.strptime( str(user.birthdate), '%Y-%m-%d').strftime('%m/%d/%Y') if user.birthdate else '',
             'interests': user.interests
         }
         return jsonify({
@@ -142,6 +151,106 @@ def update_user(user_id):
 
 # ---------------------------------------------------------------------------------------------
 
+users = {}
+
+last_user_info_sent = {}
+
+
+# Detects when a user is in the detection area of other one.
+def nearby_users_detection_loop(users: dict):
+    print('------ Detection Loop ------ ')
+    dist_treshold = 1 # in metters
+    while True:
+        users_ = users.copy()
+        l = len(users_)
+        user_data_array = np.array(list(users_.values()))
+        user_key_array = np.array(list(users_.keys()))
+        nearby_users: dict[str, list] = {}
+        for i in range(l):
+            ui = user_data_array[i]
+            for j in range(i + 1, l):
+                uj = user_data_array[j]
+                dist = great_circle((ui['lat'], ui['lon']), (uj['lat'], uj['lon'])).meters
+                # print(f'dist: {dist}')
+                if dist <= dist_treshold:
+                    if user_key_array[i] in nearby_users:
+                        nearby_users[ user_key_array[i] ].append(uj['user_id'])
+                    else:
+                        nearby_users[ user_key_array[i] ] = [ uj['user_id'] ]
+                    if user_key_array[j] in nearby_users:
+                        nearby_users[ user_key_array[j] ].append(ui['user_id'])
+                    else:
+                        nearby_users[ user_key_array[j] ] = [ ui['user_id'] ]
+        send_users_info(nearby_users)
+        time.sleep(0.5)
+
+
+# Sends the information of the nearby users to the targe user.
+def send_users_info(nearby_users: dict[str, list]):
+    for user in nearby_users:
+        # Verify if something was sent before.
+        if user in last_user_info_sent:
+            # Verify if the previous info sent was the same as the current one.
+            if set(nearby_users[user]) != set(last_user_info_sent[user]):
+                # If not, save it and send it. Else, ignore it.
+                print('-- Sending new info for:', user)
+                users_data = get_users_data(nearby_users[user])
+                last_user_info_sent[user] = nearby_users[user]
+                socketio.emit('nearby-users', users_data, to=user)
+        # If nothing was sent before, save it and send it.
+        else:
+            print('-- Firt time sending info for:', user)
+            users_data = get_users_data(nearby_users[user])
+            last_user_info_sent[user] = nearby_users[user]
+            socketio.emit('nearby-users', users_data, to=user)
+
+
+def get_users_data(user_list):
+    # user = User.query.filter_by(username=username).first()
+    query = 'select * from user where '
+    where_clause = [ f'id = {user_id}' for user_id in user_list ]
+    query = query + ' or '.join(where_clause)
+    print(query)
+    sql_text = text(query)
+    result = conn.execute(sql_text)
+    print('----------------- query result: --------------')
+    rows = result.mappings().all()
+    return rows_to_dict(rows)
+
+
+# custom for: get_users_data(...) function.
+def rows_to_dict(rows):
+    rs = []
+    for r in rows:
+        d = {
+            'id': r.id,
+            'username': r.username,
+            'name': r.name,
+            'age': r.age,
+            'birthdate': datetime.strptime( str(r.birthdate), '%Y-%m-%d').strftime('%m/%d/%Y') if r.birthdate else '',
+            'interests': r.interests
+        }
+        rs.append(d)
+    return rs
+
+
+@socketio.on('disconnect')
+def test_disconnect():
+    print(f'Client disconnected: {request.sid}')
+    if request.sid in users:
+        del users[request.sid]
+    if request.sid in last_user_info_sent:
+        del last_user_info_sent[request.sid]
+
+
+@socketio.on('update-location')
+def hanlder_update_location(data):
+    print('on: update_location')
+    users[request.sid] = data
+    print('users:', users)
+
+# --------------------------------------------------------------------------------------------- 
+
 # Lista para almacenar los datos de geolocalización de los usuarios
 usuarios = []
 
@@ -158,7 +267,7 @@ def handle_ubicacion(data):
     usuario = {
         'lat': lat,
         'lon': lon,
-        'tiempo': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        'tiempo': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     # Comprobar si el usuario está dentro del área de detección de otros usuarios
     cercanos = []
@@ -174,5 +283,12 @@ def handle_ubicacion(data):
 with app.app_context():
     db.create_all()
 
+
+def main():
+    th = Thread(target=nearby_users_detection_loop, args=(users, ))
+    th.start()
+    socketio.run(app, debug=True, port=5000)
+
+
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    main()
