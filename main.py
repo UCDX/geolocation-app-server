@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import create_engine, text
 from flask_socketio import SocketIO, emit
 from geopy.distance import great_circle
-from config import DATABASE_CONNECTION_URI
+from config import DATABASE_CONNECTION_URI, DIST_TRESHOLD
 from flask_cors import CORS
 from datetime import datetime
 from threading import Thread
@@ -155,11 +155,13 @@ users = {}
 
 last_user_info_sent = {}
 
+last_time_zero_info_was_sent = False
+
 
 # Detects when a user is in the detection area of other one.
 def nearby_users_detection_loop(users: dict):
     print('------ Detection Loop ------ ')
-    dist_treshold = 25 # in metters
+    dist_treshold = DIST_TRESHOLD # in meters
     while True:
         users_ = users.copy()
         l = len(users_)
@@ -187,7 +189,14 @@ def nearby_users_detection_loop(users: dict):
 
 # Sends the information of the nearby users to the targe user.
 def send_users_info(nearby_users: dict[str, list]):
+    global last_time_zero_info_was_sent
+    global last_user_info_sent
+    if len(nearby_users) == 0:
+        if not last_time_zero_info_was_sent:
+            socketio.emit('nearby-users', [])
+            last_time_zero_info_was_sent = True
     for user in nearby_users:
+        last_time_zero_info_was_sent = False
         # Verify if something was sent before.
         if user in last_user_info_sent:
             # Verify if the previous info sent was the same as the current one.
@@ -236,7 +245,7 @@ def rows_to_dict(rows):
 
 @socketio.on('disconnect')
 def test_disconnect():
-    print(f'Client disconnected: {request.sid}')
+    print(f'-------->>> Client disconnected: {request.sid}')
     if request.sid in users:
         del users[request.sid]
     if request.sid in last_user_info_sent:
@@ -245,7 +254,7 @@ def test_disconnect():
 
 @socketio.on('update-location')
 def hanlder_update_location(data):
-    print('on: update_location')
+    print('--- On: update_location')
     users[request.sid] = data
     print('users:', users)
 
