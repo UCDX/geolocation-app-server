@@ -253,6 +253,11 @@ def rows_to_dict(rows):
     return rs
 
 
+@socketio.on('connect')
+def test_connect(auth):
+  print(f'-------->>> Client connected:: {request.sid}')
+
+
 @socketio.on('disconnect')
 def test_disconnect():
     print(f'-------->>> Client disconnected: {request.sid}')
