@@ -18,10 +18,12 @@ MYSQL_PASSWORD=
 MYSQL_DATABASE=
 MYSQL_HOST=
 MYSQL_PORT=
+ENV=
 DIST_TRESHOLD=
 ```
 
 * DIST_TRESHOLD: distancia mínima (en metros) para detectar a otro usuario.
+* ENV: Entonrno de ejecución. Opciones: `production` o `development`
 
 ## Extra
 

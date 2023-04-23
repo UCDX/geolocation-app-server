@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import create_engine, text
 from flask_socketio import SocketIO, emit
 from geopy.distance import great_circle
-from config import DATABASE_CONNECTION_URI, DIST_TRESHOLD
+from config import DATABASE_CONNECTION_URI, ENV, DIST_TRESHOLD
 from flask_cors import CORS
 from datetime import datetime
 from threading import Thread
@@ -311,8 +311,12 @@ with app.app_context():
 def main():
     th = Thread(target=nearby_users_detection_loop, args=(users, ))
     th.start()
-    socketio.run(app, debug=True, port=5000)
-
+    if ENV == 'production':
+        socketio.run(app)
+    elif ENV == 'development':
+        socketio.run(app, debug=True, port=5000)
+    else:
+        socketio.run(app, debug=True, port=5000)
 
 if __name__ == '__main__':
     main()
