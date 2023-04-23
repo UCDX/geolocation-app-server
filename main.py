@@ -158,6 +158,14 @@ last_user_info_sent = {}
 last_time_zero_info_was_sent = False
 
 
+# Logs what the users dict have inside.
+def logs_users_connected(users):
+    print('------ Logging connected users ------')
+    while True:
+        print('---> Users connected:', users)
+        time.sleep(3)
+
+
 # Detects when a user is in the detection area of other one.
 def nearby_users_detection_loop(users: dict):
     print('------ Detection Loop ------ ')
@@ -310,7 +318,9 @@ with app.app_context():
     db.create_all()
 
 
-def main():
+def main(): #logs_users_connected
+    th_log_users = Thread(target=logs_users_connected, args=(users, ))
+    th_log_users.start()
     th = Thread(target=nearby_users_detection_loop, args=(users, ))
     th.start()
     if ENV == 'production':
