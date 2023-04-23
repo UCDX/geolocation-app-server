@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import create_engine, text
 from flask_socketio import SocketIO, emit
 from geopy.distance import great_circle
-from config import DATABASE_CONNECTION_URI, ENV
+from config import DATABASE_CONNECTION_URI, ENV, DIST_TRESHOLD
 from flask_cors import CORS
 from datetime import datetime
 from threading import Thread
@@ -155,11 +155,13 @@ users = {}
 
 last_user_info_sent = {}
 
+last_time_zero_info_was_sent = False
+
 
 # Detects when a user is in the detection area of other one.
 def nearby_users_detection_loop(users: dict):
     print('------ Detection Loop ------ ')
-    dist_treshold = 25 # in metters
+    dist_treshold = DIST_TRESHOLD # in meters
     while True:
         users_ = users.copy()
         l = len(users_)
@@ -181,13 +183,20 @@ def nearby_users_detection_loop(users: dict):
                         nearby_users[ user_key_array[j] ].append(ui['user_id'])
                     else:
                         nearby_users[ user_key_array[j] ] = [ ui['user_id'] ]
-        send_users_info(nearby_users)
+        send_users_info(nearby_users, user_key_array)
         time.sleep(0.5)
 
 
 # Sends the information of the nearby users to the targe user.
-def send_users_info(nearby_users: dict[str, list]):
+def send_users_info(nearby_users: dict[str, list], all_users):
+    global last_time_zero_info_was_sent
+    global last_user_info_sent
+    # if len(nearby_users) == 0:
+    #     if not last_time_zero_info_was_sent:
+    #         socketio.emit('nearby-users', [])
+    #         last_time_zero_info_was_sent = True
     for user in nearby_users:
+        last_time_zero_info_was_sent = False
         # Verify if something was sent before.
         if user in last_user_info_sent:
             # Verify if the previous info sent was the same as the current one.
@@ -203,6 +212,16 @@ def send_users_info(nearby_users: dict[str, list]):
             users_data = get_users_data(nearby_users[user])
             last_user_info_sent[user] = nearby_users[user]
             socketio.emit('nearby-users', users_data, to=user)
+    remain_users = set(all_users) - set(list(nearby_users.keys()))
+    for u in remain_users:
+        if u in last_user_info_sent:
+            if len(last_user_info_sent[u]) > 0:
+                last_user_info_sent[u] = []
+                socketio.emit('nearby-users', [])
+        else:
+            last_user_info_sent[u] = []
+            socketio.emit('nearby-users', [])
+            
 
 
 def get_users_data(user_list):
@@ -236,7 +255,7 @@ def rows_to_dict(rows):
 
 @socketio.on('disconnect')
 def test_disconnect():
-    print(f'Client disconnected: {request.sid}')
+    print(f'-------->>> Client disconnected: {request.sid}')
     if request.sid in users:
         del users[request.sid]
     if request.sid in last_user_info_sent:
@@ -245,7 +264,7 @@ def test_disconnect():
 
 @socketio.on('update-location')
 def hanlder_update_location(data):
-    print('on: update_location')
+    print('--- On: update_location')
     users[request.sid] = data
     print('users:', users)
 
