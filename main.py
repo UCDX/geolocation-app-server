@@ -256,6 +256,7 @@ def rows_to_dict(rows):
 @socketio.on('connect')
 def test_connect(auth):
   print(f'-------->>> Client connected:: {request.sid}')
+  print('users:', users)
 
 
 @socketio.on('disconnect')
@@ -265,6 +266,7 @@ def test_disconnect():
         del users[request.sid]
     if request.sid in last_user_info_sent:
         del last_user_info_sent[request.sid]
+    print('users:', users)
 
 
 @socketio.on('update-location')
