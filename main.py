@@ -19,7 +19,7 @@ db = SQLAlchemy(app)
 
 # DB
 
-engine = create_engine(DATABASE_CONNECTION_URI, pool_size=10, pool_recycle=3600)
+engine = create_engine(DATABASE_CONNECTION_URI, pool_size=1, pool_recycle=3600)
 conn = engine.connect()
 
 # ---------------------------------------------------------------------------------------------
