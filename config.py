@@ -9,3 +9,4 @@ host = os.environ['MYSQL_HOST']
 database = os.environ['MYSQL_DATABASE']
 
 DATABASE_CONNECTION_URI = f'mysql://{user}:{password}@{host}/{database}?ssl=disabled'
+ENV=os.environ['ENV']

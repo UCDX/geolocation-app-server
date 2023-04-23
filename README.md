@@ -18,7 +18,10 @@ MYSQL_PASSWORD=
 MYSQL_DATABASE=
 MYSQL_HOST=
 MYSQL_PORT=
+ENV=
 ```
+
+Opciones para variable de entorno `ENV`: `production` o `development`
 
 ## Extra
 
