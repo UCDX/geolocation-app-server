@@ -183,18 +183,18 @@ def nearby_users_detection_loop(users: dict):
                         nearby_users[ user_key_array[j] ].append(ui['user_id'])
                     else:
                         nearby_users[ user_key_array[j] ] = [ ui['user_id'] ]
-        send_users_info(nearby_users)
+        send_users_info(nearby_users, user_key_array)
         time.sleep(0.5)
 
 
 # Sends the information of the nearby users to the targe user.
-def send_users_info(nearby_users: dict[str, list]):
+def send_users_info(nearby_users: dict[str, list], all_users):
     global last_time_zero_info_was_sent
     global last_user_info_sent
-    if len(nearby_users) == 0:
-        if not last_time_zero_info_was_sent:
-            socketio.emit('nearby-users', [])
-            last_time_zero_info_was_sent = True
+    # if len(nearby_users) == 0:
+    #     if not last_time_zero_info_was_sent:
+    #         socketio.emit('nearby-users', [])
+    #         last_time_zero_info_was_sent = True
     for user in nearby_users:
         last_time_zero_info_was_sent = False
         # Verify if something was sent before.
@@ -212,6 +212,16 @@ def send_users_info(nearby_users: dict[str, list]):
             users_data = get_users_data(nearby_users[user])
             last_user_info_sent[user] = nearby_users[user]
             socketio.emit('nearby-users', users_data, to=user)
+    remain_users = set(all_users) - set(list(nearby_users.keys()))
+    for u in remain_users:
+        if u in last_user_info_sent:
+            if len(last_user_info_sent[u]) > 0:
+                last_user_info_sent[u] = []
+                socketio.emit('nearby-users', [])
+        else:
+            last_user_info_sent[u] = []
+            socketio.emit('nearby-users', [])
+            
 
 
 def get_users_data(user_list):
