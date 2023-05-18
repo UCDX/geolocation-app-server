@@ -9,6 +9,7 @@ from datetime import datetime
 from threading import Thread
 import numpy as np
 import time
+import CommentClassifier as CC
 
 app = Flask(__name__)
 # Configurar CORS
@@ -21,6 +22,9 @@ db = SQLAlchemy(app)
 
 engine = create_engine(DATABASE_CONNECTION_URI, pool_size=1, pool_recycle=3600)
 conn = engine.connect()
+
+# Modelo para clasificar comentarios
+commentClassifier=CC.Classifier()
 
 # ---------------------------------------------------------------------------------------------
 
@@ -56,6 +60,33 @@ class Comment(db.Model):
         self.fromUserId=fromUserId
         self.toUserId=toUserId
         self.rate=rate
+
+# Ruta para postear un comentario
+@app.route('/comment', methods=['POST'])
+def createComment():
+    data = request.get_json()
+    if data:
+    # obtiene los datos del json
+        comment = data.get('comment')
+        fromUserId = data.get('fromUserId')
+        toUserId=data.get('toUserId')
+        rate=commentClassifier.classifyComment(comment) # Usa el modelo para clasificar el comentario
+
+        # Crear un nuevo comentario y lo almacena en la BD
+        newComment = Comment(comment,fromUserId,toUserId,rate)
+        db.session.add(newComment)
+        db.session.commit()
+
+        # Retorna una respuesta en formato JSON con los datos de registro exitoso
+        return jsonify({
+            'message': 'Registro exitoso',
+            'data': {
+                'id': newComment.id,
+                'username': newComment.comment,
+            }
+        }), 200
+    else:
+        return jsonify({'message': 'Error en el formato de los datos'}), 400
 
 # Ruta para el registro de usuarios
 @app.route('/register', methods=['POST'])
