@@ -42,6 +42,21 @@ class User(db.Model):
         self.birthdate = birthdate
         self.interests = interests
 
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    comment = db.Column(db.String(500), nullable=False)
+    fromUserId = db.Column(db.Integer,db.ForeignKey('user.id'), nullable=False,)
+    toUserId = db.Column(db.Integer, db.ForeignKey('user.id'),nullable=False)
+    rate=db.Column(db.Integer, nullable=False)
+    fromUser = db.relationship('User',foreign_keys=[fromUserId], backref=db.backref('fromUser_comment', lazy=True))  # Relación uno a muchos
+    toUser = db.relationship('User',foreign_keys=[toUserId], backref=db.backref('comment', lazy=True))  # Relación uno a muchos
+
+    def __init__(self, comment,fromUserId,toUserId,rate):
+        self.comment=comment
+        self.fromUserId=fromUserId
+        self.toUserId=toUserId
+        self.rate=rate
+
 # Ruta para el registro de usuarios
 @app.route('/register', methods=['POST'])
 def register():
@@ -242,20 +257,43 @@ def get_users_data(user_list):
     result = conn.execute(sql_text)
     print('----------------- query result: --------------')
     rows = result.mappings().all()
-    return rows_to_dict(rows)
+
+    # Obtiene todos los comentarios de los usuarios cercanos
+    query='select C.comment,C.rate,FU.name,C.toUserId from comment as C inner join user as FU on FU.id=C.fromUserId where '
+    where_clause = [ f'C.toUserId = {user_id}' for user_id in user_list ]
+    query = query + ' or '.join(where_clause)
+    print(query)
+    sql_text = text(query)
+    result = conn.execute(sql_text)
+    print('----------------- query result: --------------')
+    commentsRows = result.mappings().all()
+    return rows_to_dict(rows,commentsRows)
 
 
 # custom for: get_users_data(...) function.
-def rows_to_dict(rows):
+def rows_to_dict(rows,commentsRows):
     rs = []
     for r in rows:
+        comments=[]
+
+        for commentRow in commentsRows:
+            if commentRow.toUserId==r.id:
+                comment={
+                    'comment':commentRow.comment,
+                    'rate':commentRow.rate,
+                    'from':commentRow.name,
+                }
+
+                comments.append(comment)
+
         d = {
             'id': r.id,
             'username': r.username,
             'name': r.name,
             'age': r.age,
             'birthdate': datetime.strptime( str(r.birthdate), '%Y-%m-%d').strftime('%m/%d/%Y') if r.birthdate else '',
-            'interests': r.interests
+            'interests': r.interests,
+            'comments':comments
         }
         rs.append(d)
     return rs
