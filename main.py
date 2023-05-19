@@ -4,12 +4,14 @@ from sqlalchemy import create_engine, text
 from flask_socketio import SocketIO, emit
 from geopy.distance import great_circle
 from config import DATABASE_CONNECTION_URI, ENV, DIST_TRESHOLD
+import config
 from flask_cors import CORS
 from datetime import datetime
 from threading import Thread
 import numpy as np
 import time
 import CommentClassifier as CC
+from mysql import connector
 
 app = Flask(__name__)
 # Configurar CORS
@@ -83,6 +85,7 @@ def createComment():
             'data': {
                 'id': newComment.id,
                 'username': newComment.comment,
+                'rate': rate
             }
         }), 200
     else:
@@ -154,6 +157,49 @@ def get_user(user_id):
             'birthdate': datetime.strptime( str(user.birthdate), '%Y-%m-%d').strftime('%m/%d/%Y') if user.birthdate else '',
             'interests': user.interests
         }
+        # Obtiene todos los comentarios de los usuarios cercanos
+        #query='select C.comment,C.rate,FU.name,C.toUserId from comment as C inner join user as FU on FU.id=C.fromUserId where '
+        query='select C.comment,C.rate,FU.name,C.toUserId from comment as C inner join user as FU on FU.id=C.fromUserId where '
+        user_list = [user_id]
+        where_clause = [ f'C.toUserId = {user_id}' for user_id in user_list ]
+        query = query + ' or '.join(where_clause)
+        print(query)
+        # sql_text = text(query)
+        # result = conn.execute(sql_text)
+        # commentsRows = result.mappings().all()
+
+        mysql_conn = connector.connect(
+            host=config.host,
+            user=config.user,
+            password=config.password,
+            database=config.database
+        )
+
+        cursor = mysql_conn.cursor()
+        cursor.execute(query)
+        comments=[]
+        print('----------------- query result: --------------')
+        for (comment, rate, name, toUserId) in cursor:
+            print(f'comment={comment}, rate={rate}, name={name}, toUserId={toUserId}.')
+            comments.append({
+                'comment':comment,
+                'rate':rate,
+                'from':name
+            })
+        cursor.close()
+        print(comments)
+        
+        #commentsRows = dict(commentsRows)
+        #print(commentsRows)
+        # comments=[]
+        # for commentRow in commentsRows:
+        #     comments.append({
+        #         'comment':commentRow.comment,
+        #         'rate':commentRow.rate,
+        #         'from':commentRow.name,
+        #     })
+        user_info['comments'] = comments
+        # Fin de obtener los comentarios.
         return jsonify({
             'message': 'Datos del usuario recuperados exitosamente',
             'data': user_info
@@ -333,7 +379,8 @@ def rows_to_dict(rows,commentsRows):
 @socketio.on('connect')
 def test_connect(auth):
   print(f'-------->>> Client connected:: {request.sid}')
-  print('users:', users)
+  #print('users:', users)
+  pass
 
 
 @socketio.on('disconnect')
@@ -348,9 +395,9 @@ def test_disconnect():
 
 @socketio.on('update-location')
 def hanlder_update_location(data):
-    print('--- On: update_location')
+    #print('--- On: update_location')
     users[request.sid] = data
-    print('users:', users)
+    #print('users:', users)
 
 # --------------------------------------------------------------------------------------------- 
 
@@ -395,9 +442,9 @@ def main(): #logs_users_connected
     if ENV == 'production':
         socketio.run(app)
     elif ENV == 'development':
-        socketio.run(app, debug=True, port=5000)
+        socketio.run(app, debug=False, port=5000)
     else:
-        socketio.run(app, debug=True, port=5000)
+        socketio.run(app, debug=False, port=5000)
 
 if __name__ == '__main__':
     main()
