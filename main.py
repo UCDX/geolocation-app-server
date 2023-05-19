@@ -9,6 +9,7 @@ from datetime import datetime
 from threading import Thread
 import numpy as np
 import time
+import CommentClassifier as CC
 
 app = Flask(__name__)
 # Configurar CORS
@@ -21,6 +22,9 @@ db = SQLAlchemy(app)
 
 engine = create_engine(DATABASE_CONNECTION_URI, pool_size=1, pool_recycle=3600)
 conn = engine.connect()
+
+# Modelo para clasificar comentarios
+commentClassifier=CC.Classifier()
 
 # ---------------------------------------------------------------------------------------------
 
@@ -41,6 +45,48 @@ class User(db.Model):
         self.age = age
         self.birthdate = birthdate
         self.interests = interests
+
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    comment = db.Column(db.String(500), nullable=False)
+    fromUserId = db.Column(db.Integer,db.ForeignKey('user.id'), nullable=False,)
+    toUserId = db.Column(db.Integer, db.ForeignKey('user.id'),nullable=False)
+    rate=db.Column(db.Integer, nullable=False)
+    fromUser = db.relationship('User',foreign_keys=[fromUserId], backref=db.backref('fromUser_comment', lazy=True))  # Relación uno a muchos
+    toUser = db.relationship('User',foreign_keys=[toUserId], backref=db.backref('comment', lazy=True))  # Relación uno a muchos
+
+    def __init__(self, comment,fromUserId,toUserId,rate):
+        self.comment=comment
+        self.fromUserId=fromUserId
+        self.toUserId=toUserId
+        self.rate=rate
+
+# Ruta para postear un comentario
+@app.route('/comment', methods=['POST'])
+def createComment():
+    data = request.get_json()
+    if data:
+    # obtiene los datos del json
+        comment = data.get('comment')
+        fromUserId = data.get('fromUserId')
+        toUserId=data.get('toUserId')
+        rate=commentClassifier.classifyComment(comment) # Usa el modelo para clasificar el comentario
+
+        # Crear un nuevo comentario y lo almacena en la BD
+        newComment = Comment(comment,fromUserId,toUserId,rate)
+        db.session.add(newComment)
+        db.session.commit()
+
+        # Retorna una respuesta en formato JSON con los datos de registro exitoso
+        return jsonify({
+            'message': 'Registro exitoso',
+            'data': {
+                'id': newComment.id,
+                'username': newComment.comment,
+            }
+        }), 200
+    else:
+        return jsonify({'message': 'Error en el formato de los datos'}), 400
 
 # Ruta para el registro de usuarios
 @app.route('/register', methods=['POST'])
@@ -242,20 +288,43 @@ def get_users_data(user_list):
     result = conn.execute(sql_text)
     print('----------------- query result: --------------')
     rows = result.mappings().all()
-    return rows_to_dict(rows)
+
+    # Obtiene todos los comentarios de los usuarios cercanos
+    query='select C.comment,C.rate,FU.name,C.toUserId from comment as C inner join user as FU on FU.id=C.fromUserId where '
+    where_clause = [ f'C.toUserId = {user_id}' for user_id in user_list ]
+    query = query + ' or '.join(where_clause)
+    print(query)
+    sql_text = text(query)
+    result = conn.execute(sql_text)
+    print('----------------- query result: --------------')
+    commentsRows = result.mappings().all()
+    return rows_to_dict(rows,commentsRows)
 
 
 # custom for: get_users_data(...) function.
-def rows_to_dict(rows):
+def rows_to_dict(rows,commentsRows):
     rs = []
     for r in rows:
+        comments=[]
+
+        for commentRow in commentsRows:
+            if commentRow.toUserId==r.id:
+                comment={
+                    'comment':commentRow.comment,
+                    'rate':commentRow.rate,
+                    'from':commentRow.name,
+                }
+
+                comments.append(comment)
+
         d = {
             'id': r.id,
             'username': r.username,
             'name': r.name,
             'age': r.age,
             'birthdate': datetime.strptime( str(r.birthdate), '%Y-%m-%d').strftime('%m/%d/%Y') if r.birthdate else '',
-            'interests': r.interests
+            'interests': r.interests,
+            'comments':comments
         }
         rs.append(d)
     return rs
