@@ -16,7 +16,7 @@ from mysql import connector
 app = Flask(__name__)
 # Configurar CORS
 CORS(app, resources={r"/*": {"origins": "*"}})  # Permitir todas las solicitudes desde cualquier origen
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True, debug=False)
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_CONNECTION_URI
 db = SQLAlchemy(app)
 
@@ -439,11 +439,15 @@ def main(): #logs_users_connected
     th_log_users.start()
     th = Thread(target=nearby_users_detection_loop, args=(users, ))
     th.start()
+    _host=None
     if ENV == 'production':
-        socketio.run(app)
+        # socketio.run(app, debug=False, host=_host)
+        socketio.run(app, debug=False)
     elif ENV == 'development':
+        # socketio.run(app, debug=False, port=5000, host=_host)
         socketio.run(app, debug=False, port=5000)
     else:
+        # socketio.run(app, debug=False, port=5000, host=_host)
         socketio.run(app, debug=False, port=5000)
 
 if __name__ == '__main__':
